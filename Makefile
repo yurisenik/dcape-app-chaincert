@@ -10,7 +10,7 @@ USE_DB ?= no
 # This package defines the full service, including its Traefik labels.
 USE_DCAPE_DC := no
 SOURCE_REPO ?= https://github.com/yurisenik/chaincert.git
-SOURCE_REF ?= v1.1.2
+SOURCE_REF ?= v1.2.0
 SOURCE_CONTEXT ?= $(SOURCE_REPO)\#$(SOURCE_REF)
 IMAGE ?= chaincert
 IMAGE_VER ?= $(SOURCE_REF)
