@@ -1,8 +1,8 @@
 services:
   app:
-    image: ${IMAGE:-chaincert}:${IMAGE_VER:-v1.0.0}
+    image: ${IMAGE:-chaincert}:${IMAGE_VER:-v1.0.1}
     build:
-      context: ${SOURCE_CONTEXT:-${SOURCE_REPO:-https://github.com/yurisenik/chaincert.git}#${SOURCE_REF:-v1.0.0}}
+      context: ${SOURCE_CONTEXT:-${SOURCE_REPO:-https://github.com/yurisenik/chaincert.git}#${SOURCE_REF:-v1.0.1}}
       dockerfile: Dockerfile
     pull_policy: never
     restart: unless-stopped
@@ -20,6 +20,7 @@ services:
     pids_limit: 128
     environment:
       CHAINCERT_DENY_IPS: ${CHAINCERT_DENY_IPS:-}
+      CHAINCERT_PROBE_LABEL: ${CHAINCERT_PROBE_LABEL:-}
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
       interval: 30s
