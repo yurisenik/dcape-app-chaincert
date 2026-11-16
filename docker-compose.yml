@@ -1,8 +1,8 @@
 services:
   app:
-    image: ${IMAGE:-chaincert}:${IMAGE_VER:-v1.1.0}
+    image: ${IMAGE:-chaincert}:${IMAGE_VER:-v1.1.1}
     build:
-      context: ${SOURCE_CONTEXT:-${SOURCE_REPO:-https://github.com/yurisenik/chaincert.git}#${SOURCE_REF:-v1.1.0}}
+      context: ${SOURCE_CONTEXT:-${SOURCE_REPO:-https://github.com/yurisenik/chaincert.git}#${SOURCE_REF:-v1.1.1}}
       dockerfile: Dockerfile
     pull_policy: never
     restart: unless-stopped
