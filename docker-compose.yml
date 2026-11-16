@@ -1,0 +1,54 @@
+services:
+  app:
+    image: ${IMAGE:-chaincert}:${IMAGE_VER:-v1.0.0}
+    build:
+      context: ${SOURCE_CONTEXT:-${SOURCE_REPO:-https://github.com/yurisenik/chaincert.git}#${SOURCE_REF:-v1.0.0}}
+      dockerfile: Dockerfile
+    pull_policy: never
+    restart: unless-stopped
+    init: true
+    user: "65532:65532"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=32m,mode=1777
+    mem_limit: ${MEM_LIMIT:-256m}
+    cpus: ${CPU_LIMIT:-1.0}
+    pids_limit: 128
+    environment:
+      CHAINCERT_DENY_IPS: ${CHAINCERT_DENY_IPS:-}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    labels:
+      - traefik.enable=true
+      - dcape.traefik.tag=${DCAPE_TAG:-dcape}
+      - traefik.docker.network=${DCAPE_NET:-dcape}
+      - traefik.http.routers.${APP_TAG:-chaincert}.rule=Host(`${APP_SITE:-chaincert.example.org}`)
+      - traefik.http.routers.${APP_TAG:-chaincert}.tls=${USE_TLS:-true}
+      - traefik.http.routers.${APP_TAG:-chaincert}.tls.certresolver=${TLS_RESOLVER:-default}
+      - traefik.http.routers.${APP_TAG:-chaincert}.service=${APP_TAG:-chaincert}
+      - traefik.http.services.${APP_TAG:-chaincert}.loadbalancer.server.port=8080
+      - traefik.http.routers.${APP_TAG:-chaincert}.middlewares=${APP_TAG:-chaincert}-rate@docker,${APP_TAG:-chaincert}-concurrency@docker
+      - traefik.http.middlewares.${APP_TAG:-chaincert}-rate.ratelimit.average=${RATE_AVERAGE:-5}
+      - traefik.http.middlewares.${APP_TAG:-chaincert}-rate.ratelimit.period=1s
+      - traefik.http.middlewares.${APP_TAG:-chaincert}-rate.ratelimit.burst=${RATE_BURST:-10}
+      - traefik.http.middlewares.${APP_TAG:-chaincert}-concurrency.inflightreq.amount=${MAX_INFLIGHT:-10}
+    networks:
+      - default
+
+networks:
+  default:
+    name: ${DCAPE_NET:-dcape}
+    external: true

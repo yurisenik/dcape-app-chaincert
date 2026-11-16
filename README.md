@@ -1,0 +1,99 @@
+# Chaincert для DCAPE
+
+Пакет развёртывания [Chaincert](https://github.com/yurisenik/chaincert) через
+Traefik в DCAPE. Собирает Go-приложение из исходников тега `v1.0.0`;
+публикация образа в GHCR не требуется. База данных и постоянные тома не нужны.
+
+## Установка
+
+Нужны работающий DCAPE с Traefik, Docker Engine с Compose v2 и BuildKit,
+Git и Make. DNS имени приложения должен указывать на сервер, а Traefik должен
+уже обслуживать HTTPS с резолвером `default` (либо выбранным `TLS_RESOLVER`).
+Пакет использует внешнюю Docker-сеть DCAPE и не публикует порт на хосте.
+
+```bash
+git clone https://github.com/yurisenik/dcape-app-chaincert.git
+cd dcape-app-chaincert
+cp .env.example .env
+# Измените APP_SITE, APP_TAG, DCAPE_NET, CHAINCERT_DENY_IPS и при необходимости TLS_RESOLVER.
+make config
+make build
+make up
+curl --fail https://chaincert.d.senik.su/healthz
+```
+
+В примере `APP_SITE=chaincert.d.senik.su`; для другой установки задайте своё
+имя. Без `.env` прямой Compose использует `chaincert.example.org`. Через
+DCAPE Makefile домен по умолчанию берётся из `DCAPE_DOMAIN`.
+
+`Makefile` читает `/opt/dcape/.dcape.env`, если он установлен, а затем
+локальный `.env`; поддерживает привычные `make up`, `make down`,
+`make dc CMD=...`. Файл Compose содержит полный сервис и маршрутизацию;
+базовый `docker-compose.app.yml` не нужен. Команды сборки и проверки конфига
+работают и без установленного DCAPE; для запуска нужна его внешняя сеть.
+
+Вместо Make можно использовать Compose напрямую:
+
+```bash
+docker compose --env-file .env config
+docker compose --env-file .env build --pull
+docker compose --env-file .env up -d
+docker compose --env-file .env ps
+```
+
+По умолчанию BuildKit получает исходники из Git по тегу. Для локального
+checkout того же тега используйте `make build-local`: команда клонирует
+исходники в игнорируемый каталог `.source/chaincert` и собирает их. Локальные
+изменения в этом checkout блокируют обновление, чтобы не потерять работу.
+Зависимости и базовые образы при первой сборке скачиваются из сети.
+
+## Проверка и обновление
+
+```bash
+docker compose --env-file .env ps
+make logs
+curl --fail https://chaincert.d.senik.su/healthz
+```
+
+Откройте сайт и проверьте сборку цепочки на тестовом сертификате. Healthcheck
+проверяет доступность HTTP, но не заменяет эту проверку.
+
+Перед обновлением сохраните текущие значения версии и локальный образ.
+Получите изменения этого пакета через `git pull --ff-only`, затем измените
+в `.env` `SOURCE_REF` и `IMAGE_VER` на одну
+и ту же новую версию. Выполните `make update`, затем повторите проверки.
+Для отката верните оба значения на предыдущую версию и выполните
+`make build && make up`. Разные `IMAGE_VER` сохраняют предыдущий локальный
+образ; не удаляйте его до приёмки обновления. Для фиксации точного исходного
+состояния можно указать полный commit SHA в `SOURCE_REF` вместо
+перемещаемого тега, оставив `IMAGE_VER` удобным обозначением образа.
+
+## Ограничения и защита
+
+Контейнер работает с UID/GID `65532`, файловой системой только для чтения,
+отдельным временным `/tmp`, без capabilities, с ротацией Docker-логов. В Compose заданы лимиты памяти, CPU и PID; их применение зависит от поддержки cgroups ядром узла. Внутренний порт приложения — `8080`, проверка
+состояния — `GET /healthz`. Пакет рассчитывает на наличие `wget` в образе.
+
+Traefik ограничивает запросы по адресу клиента: в среднем 5 запросов/с,
+всплеск до 10, не более 10 одновременных запросов на весь роутер. Эти лимиты
+можно менять через `.env`. Если перед Traefik стоит другой прокси, настройте
+доверенные forwarded headers и стратегию IP в DCAPE: иначе клиенты могут
+разделять один лимит. Лимит применяется ко всем HTTP-запросам, включая
+статику. HTTP → HTTPS должен перенаправлять сам Traefik DCAPE.
+
+Укажите публичные IP Docker-хоста через запятую в `CHAINCERT_DENY_IPS`,
+чтобы исключить подключения к этому хосту при проверке адреса и загрузке AIA.
+В примере указан `78.24.180.212` для `d.senik.su`; замените его для своей
+установки. Приложение дополнительно блокирует приватные и служебные адреса.
+
+Не помещайте закрытые ключи и реальные клиентские данные в репозиторий.
+Приложение опубликовано без аутентификации; при необходимости ограничьте
+доступ штатными средствами Traefik/DCAPE.
+
+Справочники: [Git build contexts в Docker](https://docs.docker.com/build/concepts/context/#git-repositories),
+[RateLimit в Traefik](https://doc.traefik.io/traefik/reference/routing-configuration/http/middlewares/ratelimit/).
+
+## Лицензия
+
+Файлы пакета развёртывания распространяются по [лицензии MIT](LICENSE).
+У [самого приложения](https://github.com/yurisenik/chaincert) отдельная лицензия AGPL-3.0-only.
